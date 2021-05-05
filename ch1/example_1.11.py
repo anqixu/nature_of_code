@@ -1,11 +1,48 @@
 #!/usr/bin/env python
 
+import random
 import sys
 
 from PyQt5.QtWidgets import QAction, QApplication, QMainWindow, qApp
-from PyQt5.QtGui import QBrush, QColor, QPainter, QPen
+from PyQt5.QtGui import QBrush, QColor, QPainter
 from PyQt5.QtCore import QRect, QTimer, Qt, pyqtSlot
 from structs import PVector
+
+
+class Mover:
+    def __init__(self, width, height):
+        self.width = width
+        self.height = height
+        self.location = PVector(random.randrange(self.width), random.randrange(self.height))
+        self.velocity = PVector(0, 0)
+        self.topspeed = 4
+
+    def update(self, mousePos):
+        mouse = PVector(mousePos.x, mousePos.y)
+        dir = mouse - self.location
+        dir.normalize()
+        dir *= 0.5
+        acceleration = dir
+
+        self.velocity += acceleration
+        self.velocity.limit(self.topspeed)
+        self.location += self.velocity
+
+    def display(self, qp):
+        qp.setPen(Qt.NoPen)
+        qp.setBrush(QBrush(QColor(175, 175, 175)))
+        qp.drawEllipse(int(self.location.x), int(self.location.y), 32, 32)
+
+    def checkEdges(self):
+        if self.location.x > self.width:
+            self.location.x = 0
+        elif self.location.x < 0:
+            self.location.x = self.width
+
+        if self.location.y > self.height:
+            self.location.y = 0
+        elif self.location.y < 0:
+            self.location.y = self.height
 
 
 class MyWindow(QMainWindow):
@@ -36,6 +73,11 @@ class MyWindow(QMainWindow):
         stepAct.setShortcut("S")
         stepAct.triggered.connect(self._handleStep)
         actionMenu.addAction(stepAct)
+
+        resetAct = QAction("&Reset", self)
+        resetAct.setShortcut("R")
+        resetAct.triggered.connect(self.setup)
+        actionMenu.addAction(resetAct)
 
         exitAct = QAction("&Quit", self)
         exitAct.setShortcut("Q")
@@ -72,22 +114,17 @@ class MyWindow(QMainWindow):
     def setup(self):
         self.mousePos = None
         self.setMouseTracking(True)
-        
+
         self.setGeometry(100, 100, 640, 360)
+        self.movers = [Mover(self.width(), self.height()) for _ in range(20)]
 
     def draw(self, qp):
         qp.fillRect(QRect(0, 0, self.width(), self.height()), QColor(255, 255, 255))
-
         if self.mousePos is not None:
-            mouse = PVector(self.mousePos.x, self.mousePos.y)
-            center = PVector(self.width() // 2, self.height() // 2)
-            mouse -= center
-
-            m = mouse.mag()
-            qp.fillRect(QRect(0, 0, m, 10), QBrush(QColor(0, 0, 0)))
-
-            qp.setPen(QPen(QColor(0, 0, 0)))
-            qp.drawLine(center.x, center.y, center.x + mouse.x, center.y + mouse.y)
+            for mover in self.movers:
+                mover.update(self.mousePos)
+                mover.checkEdges()
+                mover.display(qp)
 
     @staticmethod
     def main():
